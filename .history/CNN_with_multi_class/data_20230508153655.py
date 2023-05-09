@@ -49,7 +49,7 @@ def get_data_split(path, split=[6, 1, 1], save=True, out_dir='./data', modes=['t
     :param modes: the modes at different timestamp, support modes like: (train, dev, test), (train, dev) and (test)
     :return: six data with ratio specified by `split`.
     """
-    # 该函数运行后，直接把数据集文件夹path下的所有文件和label分成train、dev、test三块，你的modes里填啥，返回啥而已
+
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
         train_path, dev_path, test_path = os.path.join(out_dir, 'train.npy'), os.path.join(out_dir, 'dev.npy'), os.path.join(out_dir, 'test.npy')
