@@ -65,7 +65,6 @@ def train(path, split=[6, 1, 1], batch_size=64, epochs=100, learning_rate=0.001,
     criterion = torch.nn.CrossEntropyLoss()
 
     model = model.to(device)
-    
 
     # 从已保存的状态中加载模型
     if continue_pkl is not None and os.path.exists(os.path.join(model_dir, continue_pkl)):

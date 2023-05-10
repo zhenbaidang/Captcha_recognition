@@ -98,7 +98,7 @@ class CaptchaDataset(Dataset):
         actualIndex = index % self.y_data.shape[0]
         img = Image.open(self.x_data[actualIndex])
         img_tensor = self.image_transformer(img)
-        return img_tensor, torch.tensor(self.y_data[actualIndex], dtype=torch.long)
+        return img_tensor, torch.tensor(self.y_data[actualIndex], dtype=torch.int32)
     
     def __len__(self):
         return self.y_data.shape[0]
