@@ -35,23 +35,18 @@ def convert2string_list(batch_index):
         pass
     else:
         raise TypeError
-    _, id2label = get_data()
-    return [''.join([id2label[char_] for char_ in line]) for line in batch_index]
 
 def acc(predict_decoded, labels):
+    _, id2label = get_data()
     # predict_decoded: list of list
     # Assuming you have a list of ground truth labels and a list of predicted labels
-    predict_string = convert2string_list(predict_decoded)
-    labels_string = convert2string_list(labels)
+    predict_string = [''.join([id2label[char_] for char_ in line]) for line in predict_decoded]
     
+    ground_truths = ['hello', 'world']
+    predictions = ['hillo', 'worlc']
 
-    distances = [lev.distance(t, p) for t, p in zip(labels_string, predict_string)]
-    total_characters = sum(len(t) for t in labels_string)
-    # Character Error Rate (CER)
-    # CER = (Substitutions + Deletions + Insertions) / Total number of reference characters
+    distances = [lev.distance(t, p) for t, p in zip(ground_truths, predictions)]
+    total_characters = sum(len(t) for t in ground_truths)
+
     cer = sum(distances) / total_characters
-
-    all_eq = [t == p for t, p in zip(labels_string, predict_string)]
-    multi_acc = sum(all_eq) / len(all_eq)
-
-    return 1 - cer, multi_acc
+    print(f"Character Error Rate: {cer}")

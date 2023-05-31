@@ -1,18 +1,13 @@
 import os
 import json
-import click
 from tqdm import tqdm
-
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-
 from model import CRNN
 from data import get_data_split, CaptchaDataset
-from metrics import transposition, acc
-
-
+from metrics import transposition
 def save_history(filename, history, history_path):
     if not os.path.exists(history_path):
         os.mkdir(history_path)
@@ -28,7 +23,6 @@ def load_history(filename, history_path):
     with open(filepath, 'r') as file:
         history = json.load(file)
     return history
-
 
 def train(path, split=[6, 1, 1], batch_size=64, epochs=100, learning_rate=0.001, initial_epoch=0, save_frequency=2, model_dir='./model', log_dir='./history', continue_pkl=None, gpu=True):
     """
@@ -64,6 +58,7 @@ def train(path, split=[6, 1, 1], batch_size=64, epochs=100, learning_rate=0.001,
     criterion = nn.CTCLoss(blank=0)
 
     model = model.to(device)
+    
 
     # 从已保存的状态中加载模型
     if continue_pkl is not None and os.path.exists(os.path.join(model_dir, continue_pkl)):
@@ -122,32 +117,39 @@ def train(path, split=[6, 1, 1], batch_size=64, epochs=100, learning_rate=0.001,
                     optimizer.zero_grad()
                     x = x.to(device)
                     y = y.to(device)
-
-                    # output.shape = (weight(seq_len), batch_size, num_class)
-                    output = model(x)
-                    output_lengths = torch.full(
-                        (output.shape[1],), output.shape[0], dtype=torch.long).to(device)
-                    y_lengths = torch.full((y.shape[0],), y.shape[1], dtype=torch.long).to(
-                        device)  # the length of label sequence
-                    loss = criterion(output.log_softmax(
-                        2), y, output_lengths, y_lengths)
+                    
+                    output = model(x) # output.shape = (weight(seq_len), batch_size, num_class)
+                    output_lengths = torch.full((output.shape[1],), output.shape[0], dtype=torch.long).to(device)
+                    y_lengths = torch.full((y.shape[0],), y.shape[1], dtype=torch.long).to(device) # the length of label sequence
+                    loss = criterion(output.log_softmax(2), y, output_lengths, y_lengths)
 
                     predict = transposition(output)
-                    acc_mean, multi_acc_mean = acc(predict, y)
+                    
 
-                    loss_batchs.append(loss.item())
+                    # acc_total:四个字符位置的正确率之和
+                    # acc按字符正确率进行统计，把batch*class_num形状的pred在最后一维上计算argmax，和该位置字符的y相比，求平均正确率
+                    acc_total = acc(
+                        pred_1, y[:, 0]) + acc(pred_2, y[:, 1]) + acc(pred_3, y[:, 2]) + acc(pred_4, y[:, 3])
+                    # acc_mean:统计平均字符正确率
+                    acc_mean = acc_total / 4.
+                    # stack会在指定维度添加一维（ndim+1）
+                    pred = torch.stack(
+                        (pred_1, pred_2, pred_3, pred_4), dim=-1)
+                    multi_acc_mean = multi_acc(torch.argmax(pred, dim=1), y)
+
+                    loss_batchs.append(loss_total.item())
                     acc_batchs.append(acc_mean)
                     multi_acc_batchs.append(multi_acc_mean)
 
-                    batch_bar.set_postfix(loss=loss.item(
+                    batch_bar.set_postfix(loss=loss_total.item(
                     ), acc=acc_mean, multi_acc=multi_acc_mean)
                     batch_bar.update()
                     batch_history_train.append(
-                        [loss.item(), acc_mean, multi_acc_mean])
+                        [loss_total.item(), acc_mean, multi_acc_mean])
                     save_history('history_batch_train.json',
                                  batch_history_train, log_dir)
 
-                    loss.backward()
+                    loss_total.backward()
                     optimizer.step()
             epoch_bar.set_postfix(loss_mean=np.mean(loss_batchs), acc_mean=np.mean(
                 acc_batchs), multi_acc_mean=np.mean(multi_acc_batchs))
@@ -166,24 +168,24 @@ def train(path, split=[6, 1, 1], batch_size=64, epochs=100, learning_rate=0.001,
                 for batch, (x, y) in enumerate(dev_loader):
                     x = x.to(device)
                     y = y.to(device)
+                    pred_1, pred_2, pred_3, pred_4 = model(x)
+                    loss_1, loss_2, loss_3, loss_4 = criterion(pred_1, y[:, 0]), criterion(
+                        pred_2, y[:, 1]), criterion(pred_3, y[:, 2]), criterion(pred_4, y[:, 3])
+                    loss_total = loss_1 + loss_2 + loss_3 + loss_4
+                    acc_total = acc(
+                        pred_1, y[:, 0]) + acc(pred_2, y[:, 1]) + acc(pred_3, y[:, 2]) + acc(pred_4, y[:, 3])
+                    # acc_mean:统计平均字符正确率
+                    acc_mean = acc_total / 4.
+                    # stack会在指定维度添加一维（ndim+1）
+                    pred = torch.stack(
+                        (pred_1, pred_2, pred_3, pred_4), dim=-1)
+                    multi_acc_mean = multi_acc(torch.argmax(pred, dim=1), y)
 
-                    # output.shape = (weight(seq_len), batch_size, num_class)
-                    output = model(x)
-                    output_lengths = torch.full(
-                        (output.shape[1],), output.shape[0], dtype=torch.long).to(device)
-                    y_lengths = torch.full((y.shape[0],), y.shape[1], dtype=torch.long).to(
-                        device)  # the length of label sequence
-                    loss = criterion(output.log_softmax(
-                        2), y, output_lengths, y_lengths)
-
-                    predict = transposition(output)
-                    acc_mean, multi_acc_mean = acc(predict, y)
-
-                    loss_batchs_dev.append(loss.item())
+                    loss_batchs_dev.append(loss_total.item())
                     acc_batchs_dev.append(acc_mean)
                     multi_acc_batchs_dev.append(multi_acc_mean)
 
-                    batch_bar.set_postfix(loss=loss.item(
+                    batch_bar.set_postfix(loss=loss_total.item(
                     ), acc=acc_mean, multi_acc=multi_acc_mean)
                     batch_bar.update()
                 epoch_history_dev.append([np.mean(loss_batchs_dev).item(), np.mean(
@@ -206,24 +208,35 @@ def train(path, split=[6, 1, 1], batch_size=64, epochs=100, learning_rate=0.001,
             torch.save(state_dict, os.path.join(model_dir, 'model-latest.pkl'))
 
 
+# Create an instance of the CRNN model
+crnn = CRNN(imgH=32, nc=3, nclass=37, nh=256)
 
-@click.command()
-@click.help_option('-h', '--help')
-@click.option('-i', '--data_dir', default='./captchas', type=click.Path(), help='The path of Dataset', required=False)
-@click.option('-p', '--data_split', default=[6, 1, 1], nargs=3, type=int, help='The split of train dev test data', required=False)
-@click.option('-b', '--batch_size', default=128, type=int, required=False)
-@click.option('-e', '--epoch', default=120, type=int, help='The number of training epoch', required=False)
-@click.option('-r', '--learning_rate', default=0.001, type=float, help='The learning_rate of training', required=False)
-@click.option('-t', '--checkpoint', default=0, type=int, help='The initial checkpoint to start, if set, it will load model-[checkpoint].pkl', required=False)
-@click.option('-s', '--save_frequency', default=10, type=int, help='The frequence to save model', required=False)
-@click.option('-o', '--model_dir', default='./model', type=click.Path(), help='The model dir to save models or load models', required=False)
-@click.option('-l', '--log_dir', default='./history', type=click.Path(), help='The log_file path', required=False)
-@click.option('-c', '--continue_pkl', default=None, help='If continue after last checkpoint or a specified one', required=False)
-@click.option('-u', '--use_gpu', default=True, type=bool, help='use gpu', required=False)
-def read_cli(data_dir, data_split, batch_size, epoch, learning_rate, checkpoint, save_frequency, model_dir, log_dir, continue_pkl, use_gpu):
-    train(path=data_dir, split=data_split, batch_size=batch_size, epochs=epoch, learning_rate=learning_rate, initial_epoch=checkpoint,
-          save_frequency=save_frequency, model_dir=model_dir, log_dir=log_dir, continue_pkl=continue_pkl, gpu=use_gpu)
+# Move your model to the device (GPU if available, otherwise CPU)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+crnn = crnn.to(device)
 
+# Initialize the CTC Loss function
+criterion = nn.CTCLoss(blank=0)
 
-if __name__ == '__main__':
-    read_cli()
+# Let's say you have a batch of 20 images, each of size (3, 32, 128)
+inputs = torch.randn(20, 3, 32, 128).to(device)
+
+# The length of the output sequence produced by the CRNN
+input_lengths = torch.full((20,), 31, dtype=torch.long).to(device) # the length of output sequence, for example here is 31
+
+# Target sequences, in this case let's say we have sequences of length 5
+targets = torch.randint(1, 37, (20, 5), dtype=torch.long).to(device) # assume the label sequence length is 5
+
+# The length of the target sequences
+target_lengths = torch.full((20,), 5, dtype=torch.long).to(device) # the length of label sequence, for example here is 5
+
+# Forward pass through the CRNN
+outputs = crnn(inputs)
+
+# Compute the CTC loss
+loss = criterion(outputs.log_softmax(2), targets, input_lengths, target_lengths)
+
+# Backward pass and optimization
+# (assuming you have an optimizer defined as `optimizer`)
+loss.backward()
+optimizer.step()
