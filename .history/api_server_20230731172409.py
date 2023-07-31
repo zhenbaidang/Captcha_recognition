@@ -62,14 +62,15 @@ class Server(object):
     #     else:
     #         raise Exception(f"不支持的滑块算法类型: {algo_type}")
 
-    def slide_inference(self, im, im0):
+    def slide(self, im, im0):
         if self.slide_option:
+            im, im0 = zhenbot.img_bs64_to_det_model_input_tensor(img_base64)
             return self.slide.slide_inference(im, im0)
         else:
             raise Exception("slide-inference model unuse")
 
-server = Server(ocr=args.ocr, det=args.det, slide=args.slide)
-
+# server = Server(ocr=args.ocr, det=args.det, slide=args.slide)
+server = Server()
 
 def get_img(request, img_type='file', img_name='image'):
     if img_type == 'b64':
@@ -121,7 +122,7 @@ def ocr(opt, img_type='file', ret_type='text'):
             result = server.detection(img)
         elif opt == 'slide':
             im, im0 = get_img_for_slide(request)
-            result = server.slide_inference(im, im0)
+            result = server.slide(im, im0)
         else:
             raise f"<opt={opt}> is invalid"
         return set_ret(result, ret_type)

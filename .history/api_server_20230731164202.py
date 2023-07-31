@@ -62,8 +62,9 @@ class Server(object):
     #     else:
     #         raise Exception(f"不支持的滑块算法类型: {algo_type}")
 
-    def slide_inference(self, im, im0):
+    def slide(self, im, im0):
         if self.slide_option:
+            im, im0 = zhenbot.img_bs64_to_det_model_input_tensor(img_base64)
             return self.slide.slide_inference(im, im0)
         else:
             raise Exception("slide-inference model unuse")
@@ -85,12 +86,14 @@ def get_img(request, img_type='file', img_name='image'):
 
 def get_img_for_slide(request, img_type='b64', img_name='image'):
     if img_type == 'b64':
-        try: # json str of multiple images
-            dic = json.loads(request.get_data())
-            img_bytes = base64.b64decode(dic.get(img_name))
-            im, im0 = zhenbot.img_bs64_to_det_model_input_tensor(img_bytes, input_type='img_bytes')
-        except Exception as e: # just base64 of single image
-            pass
+        # img_bytes = base64.b64decode(request.get_data()) # 
+        # try: # json str of multiple images
+        #     dic = json.loads(img_bytes)
+        #     img_bytes = base64.b64decode(dic.get(img_name).encode())
+        # except Exception as e: # just base64 of single image
+        #     pass
+        # im, im0 = zhenbot.img_bs64_to_det_model_input_tensor(img_bytes, input_type='img_bytes')
+        im, im0 = zhenbot.img_bs64_to_det_model_input_tensor(request.get_data())
     else:
         # img = request.files.get(img_name).read()
         raise TypeError('Slide-inference model only support base64 input in version 0.1')
@@ -121,12 +124,12 @@ def ocr(opt, img_type='file', ret_type='text'):
             result = server.detection(img)
         elif opt == 'slide':
             im, im0 = get_img_for_slide(request)
-            result = server.slide_inference(im, im0)
+            result = server.slide(im, im0)
+            print(result)
         else:
             raise f"<opt={opt}> is invalid"
         return set_ret(result, ret_type)
     except Exception as e:
-        print(e)
         return set_ret(e, ret_type)
 
 @app.route('/slide/<algo_type>/<img_type>', methods=['POST'])

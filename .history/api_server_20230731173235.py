@@ -64,12 +64,13 @@ class Server(object):
 
     def slide_inference(self, im, im0):
         if self.slide_option:
+            im, im0 = zhenbot.img_bs64_to_det_model_input_tensor(img_base64)
             return self.slide.slide_inference(im, im0)
         else:
             raise Exception("slide-inference model unuse")
 
-server = Server(ocr=args.ocr, det=args.det, slide=args.slide)
-
+# server = Server(ocr=args.ocr, det=args.det, slide=args.slide)
+server = Server()
 
 def get_img(request, img_type='file', img_name='image'):
     if img_type == 'b64':

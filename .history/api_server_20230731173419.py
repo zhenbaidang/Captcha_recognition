@@ -68,8 +68,8 @@ class Server(object):
         else:
             raise Exception("slide-inference model unuse")
 
-server = Server(ocr=args.ocr, det=args.det, slide=args.slide)
-
+# server = Server(ocr=args.ocr, det=args.det, slide=args.slide)
+server = Server()
 
 def get_img(request, img_type='file', img_name='image'):
     if img_type == 'b64':

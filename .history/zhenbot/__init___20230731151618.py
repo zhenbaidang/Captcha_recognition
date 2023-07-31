@@ -697,9 +697,7 @@ class ZhenBot(object):
                     if save_img and conf < torch.tensor(0.8):
                         cv2.imwrite(os.path.join(
                             save_path, f"{'_'.join('_'.join(time.ctime().split()[1:]).split(':'))}_conf_{conf.item():.4f}.jpg"), im0)
-                    line = det_results[conf_max_index][1:]
-                    
-                    return ('%g ' * len(line)).rstrip() % line
+                    return det_results[conf_max_index][1:]
                 else:
                     raise Exception('No slide background detected!')
             except Exception as error:

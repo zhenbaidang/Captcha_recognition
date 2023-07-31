@@ -241,13 +241,8 @@ def scale_boxes(img1_shape, boxes, img0_shape, ratio_pad=None):
     return boxes
 
 
-def img_bs64_to_det_model_input_tensor(input_data, input_type='base64', fp16=False):
-    if input_type == 'base64':
-        img_bytes = base64.b64decode(input_data)
-    elif input_type == 'img_bytes':
-        img_bytes = input_data
-    else:
-        raise TypeError('input_type must be [bs64, img_bytes]')
+def img_bs64_to_det_model_input_tensor(img_base64, fp16=False):
+    img_bytes = base64.b64decode(img_base64)
     nparr = np.frombuffer(img_bytes, np.uint8)
 
     # read numpy array as image
@@ -697,9 +692,7 @@ class ZhenBot(object):
                     if save_img and conf < torch.tensor(0.8):
                         cv2.imwrite(os.path.join(
                             save_path, f"{'_'.join('_'.join(time.ctime().split()[1:]).split(':'))}_conf_{conf.item():.4f}.jpg"), im0)
-                    line = det_results[conf_max_index][1:]
-                    
-                    return ('%g ' * len(line)).rstrip() % line
+                    return det_results[conf_max_index][1:]
                 else:
                     raise Exception('No slide background detected!')
             except Exception as error:
